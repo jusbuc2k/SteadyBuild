@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp1.1</TargetFramework>
+    <RootNamespace>SteadyBuild</RootNamespace>
+    <AssemblyName>SteadyBuild</AssemblyName>
+    <VersionPrefix>1.0.0</VersionPrefix>
+    <VersionSuffix>preview</VersionSuffix>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SteadyBuild.Abstractions\SteadyBuild.Abstractions.csproj" />
+    <ProjectReference Include="..\SteadyBuild.Common\SteadyBuild.Common.csproj" />
+  </ItemGroup>
+
+</Project>
