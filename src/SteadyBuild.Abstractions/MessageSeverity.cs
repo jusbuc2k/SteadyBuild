@@ -6,9 +6,9 @@ namespace SteadyBuild.Abstractions
 {
     public enum MessageSeverity
     {
-        Debug,
-        Info,
-        Warn,
-        Error
+        Debug = 7,
+        Info = 6,
+        Warn = 4,
+        Error = 3
     }
 }

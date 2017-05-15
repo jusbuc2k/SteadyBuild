@@ -7,19 +7,21 @@ namespace SteadyBuild.Abstractions
     public class BuildProjectConfiguration
     {
         /// <summary>
-        /// Gets or sets the unique ID of the project.
-        /// </summary>
-        public string ProjectIdentifier { get; set; }
-
-        /// <summary>
         /// Gets or sets the project's display name
         /// </summary>
         public string Name { get; set; }
 
+        public Guid ProjectID { get; set; }
+
+        /// <summary>
+        /// Gets or sets the build environment needed for this project.
+        /// </summary>
+        public Guid EnvironmentID { get; set; }
+
         /// <summary>
         /// Gets or sets the list of notification recipients
         /// </summary>
-        public IEnumerable<string> Contacts { get; set; }
+        public ICollection<BuildProjectContact> Contacts { get; set; }
 
         public string RepositoryType { get; set; }
 
@@ -51,6 +53,10 @@ namespace SteadyBuild.Abstractions
 
         public int MaxFailureCount { get; set; } = 3;
 
-        public IEnumerable<string> Tasks { get; set; }
+        public ICollection<BuildTaskCommand> Tasks { get; set; }
+
+        public bool IsActive { get; set; }
+
+        public BuildProjectState LastState { get; set; }
     }
 }

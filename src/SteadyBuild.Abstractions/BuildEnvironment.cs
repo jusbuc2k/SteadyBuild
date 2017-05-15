@@ -8,15 +8,13 @@ namespace SteadyBuild.Abstractions
 {
     public class BuildEnvironment : IDisposable
     {
-        public const string ENV_PREFIX = "BUILD_";
+        public const string ENV_PREFIX = "CI_";
 
-        public BuildEnvironment(string workingPath) : this(workingPath, null)
-        {            
-        }
-
-        public BuildEnvironment(string workingPath, System.IO.TextWriter output)
+        public BuildEnvironment(string workingPath, IBuildOutputWriter output)
         {
             this.WorkingPath = Environment.ExpandEnvironmentVariables(workingPath);
+            this.Output = output;
+
             this.Variables = new Dictionary<string, string>();
             this.EnvironmentVariables = new Dictionary<string, string>();
 
@@ -29,21 +27,11 @@ namespace SteadyBuild.Abstractions
             {
                 System.IO.Directory.CreateDirectory(this.CodePath);
             }
-
-            if (output == null)
-            {
-                this.OwnsStream = true;
-                output = new System.IO.StreamWriter(System.IO.File.Open(this.LogFile, System.IO.FileMode.OpenOrCreate | System.IO.FileMode.Append));
-            }
             
             this.Variables["WorkingPath"] = this.WorkingPath;
             this.Variables["CodePath"] = this.CodePath;
-            this.Variables["LogFile"] = this.LogFile;
-
-            this.Output = output;            
+            //this.Variables["LogFile"] = this.LogFile;
         }
-
-        protected bool OwnsStream { get; private set; }
 
         public string WorkingPath { get; private set; }
 
@@ -52,14 +40,6 @@ namespace SteadyBuild.Abstractions
             get
             {
                 return System.IO.Path.Combine(this.WorkingPath, "src");
-            }
-        }
-
-        public string LogFile
-        {
-            get
-            {
-                return System.IO.Path.Combine(this.WorkingPath, "ci-build.log");
             }
         }
 
@@ -73,16 +53,10 @@ namespace SteadyBuild.Abstractions
             this.Variables.Add("BuildDateTime", DateTime.Now.ToString("s"));
         }
 
-        public void AddAgentVariables(BuildAgentOptions agent)
-        {
-            this.Variables.Add("AgentHost", Environment.MachineName);
-            this.Variables.Add("AgentIdentifier", agent.AgentIdentifier);
-        }
-
         public void AddProjectConfigurationVariables(BuildProjectConfiguration configuration)
         {
             this.Variables.Add("ProjectName", configuration.Name);
-            this.Variables.Add("ProjectID", configuration.ProjectIdentifier);
+            this.Variables.Add("ProjectID", configuration.ProjectID.ToString());
             this.Variables.Add("RepositoryType", configuration.RepositoryType);
             this.Variables.Add("RepositoryPath", configuration.RepositoryPath);
 
@@ -100,7 +74,7 @@ namespace SteadyBuild.Abstractions
             this.Variables.Add("BuildNumber", state.NextBuildNumber.ToString());
         }
 
-        public virtual void AddCodeInfo(CodeRepositoryInfo codeInfo)
+        public virtual void AddCodeInfoVariables(CodeRepositoryInfo codeInfo)
         {
             this.Variables.Add("RevisionAuthor", codeInfo.Author);
             this.Variables.Add("RevisionIdentifier", codeInfo.RevisionIdentifier);
@@ -132,27 +106,22 @@ namespace SteadyBuild.Abstractions
 
             return ProcessUtils.StartProcessAsync(fileName, arguments: arguments, workingPath: this.CodePath, timeout: timeoutSeconds * 1000, environment: vars, output: (msg) =>
             {
-                this.Output.WriteAsync(msg);
+                this.Output.LogDebugAsync(msg).Wait();
             }, errorOutput: (msg) =>
             {
-                this.Output.WriteAsync($"ERR: {msg}");
+                this.Output.LogErrorAsync(msg).Wait();
             });
         }
 
         public void WriteMessage(MessageSeverity severity, string message)
         {
-            this.Output.WriteLine($"{DateTime.Now:s} {severity.ToString().ToUpper()}: {message}");
+            this.Output.LogMessageAsync(severity, message).Wait();
         }
 
-        public System.IO.TextWriter Output { get; private set; }
+        protected IBuildOutputWriter Output { get; private set; }
 
         public void Dispose()
         {
-            this.Output.Flush();
-            if (this.OwnsStream)
-            {
-                this.Output.Dispose();
-            }
         }
     }
 }

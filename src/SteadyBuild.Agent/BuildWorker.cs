@@ -7,31 +7,43 @@ using System.Linq;
 
 namespace SteadyBuild.Agent
 {
+
+    /// <summary>
+    /// Represents a single worker thread excuted by the build agent.
+    /// </summary>
     public class BuildWorker
     {
         private readonly BuildAgentOptions _options;
         private readonly int _agentInstanceID;
+        private readonly IProjectRepository _repository;
 
-        public BuildWorker(BuildAgentOptions options, int agentInstanceID)
+        public BuildWorker(BuildAgentOptions options, IProjectRepository repository, int agentInstanceID)
         {
             _options = options;
             _agentInstanceID = agentInstanceID;
+            _repository = repository;
         }
 
+        /// <summary>
+        /// Processes build jobs in the given queue one at a time until the queue is emtpy.
+        /// </summary>
+        /// <param name="projectQueue"></param>
+        /// <returns></returns>
         public async Task ProcessQueueAsync(System.Collections.Concurrent.ConcurrentQueue<BuildJob> projectQueue)
         {
-            BuildJob project;
+            BuildJob buildJob;
 
-            while (projectQueue.TryDequeue(out project))
+            while (projectQueue.TryDequeue(out buildJob))
             {
                 try
                 {
-                    var environment = new BuildEnvironment(System.IO.Path.Combine(_options.WorkingPath, project.Configuration.ProjectIdentifier));
+                    var environment = new BuildEnvironment(System.IO.Path.Combine(_options.WorkingPath, buildJob.Configuration.Name), buildJob.Output);
+                    var state = buildJob.Configuration.LastState;
 
                     environment.AddGlobalVariables();
                     environment.AddAgentVariables(_options);
-                    environment.AddProjectConfigurationVariables(project.Configuration);
-                    environment.AddProjectStateVariables(project.State);
+                    environment.AddProjectConfigurationVariables(buildJob.Configuration);
+                    environment.AddProjectStateVariables(buildJob.Configuration.LastState);
 
                     // Create the working path if it does not exist
                     if (!System.IO.Directory.Exists(environment.WorkingPath))
@@ -49,74 +61,43 @@ namespace SteadyBuild.Agent
                         PathUtils.CleanFolder(environment.CodePath);
                     }
 
-                    var maxFailureCount = project.Configuration.MaxFailureCount;
-                    var codeRepo = CodeRepositoryFactory.Create(project.Configuration);
-                    var codeInfo = await codeRepo.GetInfo(project.Configuration.RepositoryPath, project.RevisionIdentifier);
+                    var maxFailureCount = buildJob.Configuration.MaxFailureCount;
+                    var codeRepo = CodeRepositoryFactory.Create(buildJob.Configuration);
+                    var codeInfo = await codeRepo.GetInfo(buildJob.Configuration.RepositoryPath, buildJob.RevisionIdentifier);
 
-                    environment.AddCodeInfo(codeInfo);
+                    environment.AddCodeInfoVariables(codeInfo);
 
-                    //var currentCommit = await codeRepo.GetInfo(project.Configuration.RepositoryPath);
-                    //var force = project.State.ForceRebuild;
+                    await codeRepo.Export(buildJob.Configuration.RepositoryPath, buildJob.RevisionIdentifier, environment.CodePath);
 
-                    //string currentCommitIdentifier = currentCommit?.RevisionIdentifier;
-
-                    //currentCommit.AddToEnvironment(environment);
-
-                    //if (!force && project.State.FailCount >= maxFailureCount && currentCommitIdentifier.Equals(project.State.LastFailCommitIdentifier))
-                    //{
-                    //    environment.WriteMessage(MessageSeverity.Warn, $"The build was skipped because it failed {project.State.FailCount} times and nothing has changed.");
-                    //    // continue to the next build
-                    //    continue;
-                    //}
-                    //else if (!force && currentCommitIdentifier.Equals(project.State.LastSuccessCommitIdentifier))
-                    //{
-                    //    environment.WriteMessage(MessageSeverity.Info, $"The build was skipped because it failed {project.State.FailCount} times and nothing has changed.");
-                    //    // continue to the next build
-                    //    continue;
-                    //}
-
-                    //if (!force)
-                    //{
-                    //    var changedFiles = await codeRepo.GetChangedFiles(project.Configuration.RepositoryPath, project.State.LastSuccessCommitIdentifier, currentCommitIdentifier);
-
-                    //    //TODO: Change Filter
-
-                    //    if (changedFiles.Count() <= 0)
-                    //    {
-                    //        environment.WriteMessage(MessageSeverity.Info, $"The build was skipped because no files in the latest commit matched the effective change filter.");
-                    //        // continue to the next build
-                    //        continue;
-                    //    }
-                    //}                
-
-                    await codeRepo.Export(project.Configuration.RepositoryPath, project.RevisionIdentifier, environment.CodePath);
-
-                    var buildResult = await project.BuildAsync(environment);
+                    var buildResult = await buildJob.Configuration.Tasks.RunAllAsync(environment);
 
                     if (buildResult.Success)
                     {
-                        project.State.FailCount = 0;
-                        project.State.LastSuccessDateTime = DateTimeOffset.UtcNow;
-                        project.State.LastSuccessCommitIdentifier = project.RevisionIdentifier;
-                        project.State.NextBuildNumber++;
+                        state.FailCount = 0;
+                        state.LastSuccessDateTime = DateTimeOffset.UtcNow;
+                        state.LastSuccessCommitIdentifier = buildJob.RevisionIdentifier;
+                        state.NextBuildNumber++;
 
                         environment.WriteMessage(MessageSeverity.Info, "The build project completed successfully.");
                     }
                     else
                     {
-                        project.State.FailCount++;
-                        project.State.LastFailDateTime = DateTimeOffset.UtcNow;
-                        project.State.LastFailCommitIdentifier = project.RevisionIdentifier;
+                        state.NextBuildNumber++;
+                        state.FailCount++;
+                        state.LastFailDateTime = DateTimeOffset.UtcNow;
+                        state.LastFailCommitIdentifier = buildJob.RevisionIdentifier;
 
-                        if (project.State.FailCount >= maxFailureCount)
+                        if (state.FailCount >= maxFailureCount)
                         {
-                            environment.WriteMessage(MessageSeverity.Error, $"The build project failed too many times ({project.State.FailCount}) and will not be attempted again.");
+                            environment.WriteMessage(MessageSeverity.Error, $"The build project failed too many times ({state.FailCount}) and will not be attempted again.");
                         }
                         else
                         {
-                            environment.WriteMessage(MessageSeverity.Warn, $"The build project has failed on try {project.State.FailCount} of {maxFailureCount} and will be attempted again.");
+                            environment.WriteMessage(MessageSeverity.Warn, $"The build project has failed on try {state.FailCount} of {maxFailureCount} and will be attempted again.");
                         }
                     }
+
+                    await _repository.SetProjectState(buildJob.Configuration.ProjectID, state);
                 }
                 catch (Exception ex)
                 {

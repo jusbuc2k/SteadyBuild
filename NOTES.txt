@@ -1,0 +1,10 @@
+Build dot net Outline
+
+Main thread
+
+watch thread
+	on code changed detected, invoke build thread and
+	queue into build thread pool
+		-> build thread
+			-> build task (msbuild, powershell, cmd, other?)
+			-> 

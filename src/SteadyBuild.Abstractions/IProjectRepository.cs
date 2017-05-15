@@ -7,12 +7,14 @@ namespace SteadyBuild.Abstractions
 {
     public interface IProjectRepository
     {
-        Task<BuildProjectConfiguration> GetProject(string projectIdentifier);
+        Task<BuildProjectConfiguration> GetProject(Guid projectIdentifier);
 
-        Task<BuildProjectState> GetProjectState(string projectIdentifier);
+        Task<BuildProjectState> GetProjectState(Guid projectIdentifier);
 
-        Task SetProjectState(string projectIdentifier, BuildProjectState state);
+        Task SetProjectState(Guid projectIdentifier, BuildProjectState state);
 
-        Task<IEnumerable<BuildProjectConfiguration>> GetProjects(string agentIdentifier);
+        Task<IEnumerable<Guid>> GetProjectsByTriggerMethodAsync(BuildTriggerMethod method);
+
+        Task<IBuildOutputWriter> GetMessageWriterAsync(Guid projectIdentifier, Guid buildIdentifier);
     }
 }

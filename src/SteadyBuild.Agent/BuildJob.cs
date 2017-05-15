@@ -7,42 +7,26 @@ using System.Threading.Tasks;
 
 namespace SteadyBuild.Agent
 {
+
+    /// <summary>
+    /// Represents a single build job for a project.
+    /// </summary>
     public class BuildJob
     {
-        public BuildJob(string revisionIdentifier, BuildProjectConfiguration config, BuildProjectState state)
+        public BuildJob(string revisionIdentifier, BuildProjectConfiguration config)
         {
             this.RevisionIdentifier = revisionIdentifier;
             this.Configuration = config;
-            this.State = state;
         }
 
-        public BuildProjectConfiguration Configuration { get; set; }
+        /// <summary>
+        /// Gets or sets the build project configuration
+        /// </summary>
+        public BuildProjectConfiguration Configuration { get; private set; }
 
-        public BuildProjectState State { get; set; }
-
-        public BuildResult LastResult { get; set; }
-
-        public string RevisionIdentifier { get; set; }
-                
-        public Task<BuildResult> BuildAsync(BuildEnvironment environment)
-        {
-            System.Threading.Thread.Sleep(5000);
-
-            return Task.FromResult(new BuildResult(0));
-
-            //foreach (var task in this.Configuration.Tasks)
-            //{
-            //    var taskRunner = new BuildTask(task);
-            //    var taskResult = await taskRunner.RunAsync(environment);
-
-            //    if (!taskResult.Success)
-            //    {
-            //        return BuildResult.Fail(taskResult.ExitCode);
-            //    }
-            //}
-
-            //return new BuildResult(0);
-        }
-
+        /// <summary>
+        /// Gets or sets the revision identifier that determines which revision of the code the job will be executed against.
+        /// </summary>
+        public string RevisionIdentifier { get; private set; }
     }
 }

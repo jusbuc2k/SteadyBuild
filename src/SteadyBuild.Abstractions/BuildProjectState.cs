@@ -19,6 +19,8 @@ namespace SteadyBuild.Abstractions
 
         public string LastFailCommitIdentifier { get; set; }
 
+        public int LastBuildResultCode { get; set; }
+
         public int FailCount { get; set; }
 
         public bool ForceRebuild { get; set; }

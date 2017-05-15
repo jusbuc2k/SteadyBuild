@@ -6,12 +6,12 @@ namespace SteadyBuild.Abstractions
 {
     public class BuildQueueEntry
     {
-        public string ProjectIdentifier { get; set; }
+        public Guid ProjectIdentifier { get; set; }
+
+        public string RevisionIdentifier { get; set; }
 
         public DateTimeOffset EnqueueDateTime { get; set; }
 
-        public DateTimeOffset ProcessedDateTime { get; set; }
-
-        public string RevisionIdentifier { get; set; }
+        public Guid BuildIdentifier { get; set; }
     }
 }

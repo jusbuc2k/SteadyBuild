@@ -11,7 +11,5 @@ namespace SteadyBuild.Abstractions
         public string AgentIdentifier { get; set; }
 
         public string WorkingPath { get; set; }
-
-        public string ProjectLogFileName { get; set; } = "ci-build.log";
     }
 }

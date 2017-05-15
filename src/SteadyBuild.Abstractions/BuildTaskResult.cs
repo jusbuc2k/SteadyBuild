@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace SteadyBuild.Agent
+namespace SteadyBuild.Abstractions
 {
     public class BuildTaskResult
     {

@@ -10,115 +10,112 @@ namespace SteadyBuild.Agent
     public class BuildAgent
     {
         private readonly System.Collections.Concurrent.ConcurrentQueue<BuildJob> _localQueue;
-        private System.Threading.CancellationTokenSource _cancelTokenSource;
-        private System.IO.TextWriter _output;
-        private readonly object _outputLock = new object();
-        private readonly System.Threading.AutoResetEvent _buildReceivedFromQueueEvent = new System.Threading.AutoResetEvent(false);
 
-        public BuildAgent(System.IO.TextWriter output, IBuildQueue queue, IProjectRepository projectRepository, BuildAgentOptions agentOptions)
+        public BuildAgent(BuildAgentOptions agentOptions, IProjectRepository repository, IBuildQueueConsumer queue, ILogger logger)
         {
-            _output = output;
+            this.Repository = repository;
             this.Queue = queue;
-            this.Projects = projectRepository;
+            this.Logger = logger;
             this.AgentOptions = agentOptions;
             _localQueue = new System.Collections.Concurrent.ConcurrentQueue<BuildJob>();
         }
 
-        protected void WriteOutputLine(string message)
-        {
-            lock (_outputLock)
-            {
-                _output.WriteLine(message);
-            }
-        }
-
-        protected void WriteErrorLine(string message)
-        {
-            this.WriteOutputLine($"ERR: {message}");
-        }
-
         protected BuildAgentOptions AgentOptions { get; private set; }
 
-        protected IBuildQueue Queue { get; private set; }
+        protected IBuildQueueConsumer Queue { get; private set; }
 
-        protected IProjectRepository Projects { get; private set; }
+        protected ILogger Logger { get; private set; }
 
-        public async Task StartAsync()
+        protected IProjectRepository Repository { get; private set; }
+
+        /// <summary>
+        /// Starts monitoring the build queue for build jobs and blocks until the process is ended.
+        /// </summary>
+        public void Run()
         {
-            _cancelTokenSource = new System.Threading.CancellationTokenSource();
-            var cancelToken = _cancelTokenSource.Token;
+            var cancelTokenSource = new System.Threading.CancellationTokenSource();
+            var cancelToken = cancelTokenSource.Token;
+            var buildReceivedEvent = new System.Threading.AutoResetEvent(false);
 
-            await Task.Run(() =>
+            this.Logger.LogInfoAsync("Build agent starting queue monitoring.").Wait();
+
+            // Queue monitoring thread
+            var monitorTask = Task.Run(async () =>
             {
-                WriteOutputLine("Build agent starting to monitor queue.");
+                while (!cancelToken.IsCancellationRequested)
+                {
+                    await this.WaitForJobsAsync();
 
-                this.MonitorQueue(cancelToken);
-
-                WriteOutputLine("Build agent exiting.");
+                    // Notify the 
+                    buildReceivedEvent.Set();
+                }                
             }, cancelToken);
 
-            _cancelTokenSource = null;
+            // Queue processing thread
+            while (!cancelToken.IsCancellationRequested)
+            {
+                buildReceivedEvent.WaitOne();
+
+                this.ProcessQueue();
+            }
+            
+            this.Logger.LogInfoAsync("Build agent is stopping.").Wait();
         }
 
-        protected void MonitorQueue(System.Threading.CancellationToken cancellationToken)
+        protected async Task WaitForJobsAsync()
         {
-            using (var subscription = this.Queue.Subscribe(this.AgentOptions.AgentIdentifier, (queueEntry) =>
+            var builds = await this.Queue.WaitForJobsAsync();
+
+            await this.Logger.LogInfoAsync($"{builds.Count()} projects were received from the build queue for processing.");
+
+            foreach (var queueEntry in builds)
             {
-                this.WriteOutputLine($"Processing a new project in the build queue (Project ID: {queueEntry.ProjectIdentifier}).");
-
-                var projectConfig = this.Projects.GetProject(queueEntry.ProjectIdentifier).Result;
-                var projectState = this.Projects.GetProjectState(queueEntry.ProjectIdentifier).Result;
-
-                _localQueue.Enqueue(new BuildJob(queueEntry.RevisionIdentifier, projectConfig, projectState));
-
-                // Notify the 
-                _buildReceivedFromQueueEvent.Set();
-            }))
-            {
-                int numberOfThreads = this.AgentOptions.ConcurrentBuilds;
-                //TODO: Setting
-                int globalTimeout = 1000 * 60 * 15;
-                var workers = new List<BuildWorker>(numberOfThreads);
-
-                for (int n = 1; n <= numberOfThreads; n++)
-                {
-                    workers.Add(new BuildWorker(this.AgentOptions, n));
-                }
-
-                //TODO: How to make sure the callback above and the loop below run in different threads?
-                // Pretty sure the callback passed to subscribe will be run in whatever thread the build queue is running in, right?
-
-                while (!cancellationToken.IsCancellationRequested)
-                {
-                    // Block until any new build is received from the build queue
-                    _buildReceivedFromQueueEvent.WaitOne();
-                    if (cancellationToken.IsCancellationRequested)
-                    {
-                        break;
-                    }
-
-                    WriteOutputLine($"Processing items in the build queue with {numberOfThreads} workers.");
-
-                    var workerTasks = workers.Select(a => a.ProcessQueueAsync(_localQueue));
-
-                    if (!Task.WhenAll(workerTasks).Wait(globalTimeout))
-                    {
-                        WriteErrorLine("At least one build worker timed out.");
-                    }
-
-                    WriteOutputLine("All queued builds completed. Sleeping until next notification from build queue.");
-                }
+                _localQueue.Enqueue(new BuildJob(queueEntry.RevisionIdentifier,
+                    await this.Repository.GetProject(queueEntry.ProjectIdentifier),
+                    await this.Repository.GetMessageWriterAsync(queueEntry.ProjectIdentifier, queueEntry.BuildIdentifier)
+                ));
             }
         }
 
-        public void Stop()
+        protected void ProcessQueue()
         {
-            if (_cancelTokenSource != null)
+            int numberOfThreads = this.AgentOptions.ConcurrentBuilds;
+            int globalTimeout = 1000 * 60 * 15;
+            var workers = new List<BuildWorker>(numberOfThreads);
+
+            for (int n = 1; n <= numberOfThreads; n++)
             {
-                // release the monitor loop wait and cancel
-                _cancelTokenSource.Cancel();
-                _buildReceivedFromQueueEvent.Set();                
+                workers.Add(new BuildWorker(this.AgentOptions, this.Repository, n));
             }
+
+            //TODO: How to make sure the callback above and the loop below run in different threads?
+            // Pretty sure the callback passed to subscribe will be run in whatever thread the build queue is running in, right?
+
+            this.Logger.LogDebugAsync($"Processing new items in the build queue with {numberOfThreads} worker(s).");
+
+            var workerTasks = workers.Select(a => a.ProcessQueueAsync(_localQueue));
+
+            if (Task.WhenAll(workerTasks).Wait(globalTimeout))
+            {
+                this.Logger.LogInfoAsync("All queued builds completed. Sleeping until next notification from build queue.");
+            }
+            else
+            {
+                this.Logger.LogErrorAsync($"Timeout occcurred while waiting for all builds to complete.");
+            }
+
+            //while (!cancellationToken.IsCancellationRequested)
+            //{
+            //    // Block until any new build is received from the build queue
+            //    _buildReceivedFromQueueEvent.WaitOne();
+            //    if (cancellationToken.IsCancellationRequested)
+            //    {
+            //        break;
+            //    }
+
+                                
+            //}
         }
+
     }
 }

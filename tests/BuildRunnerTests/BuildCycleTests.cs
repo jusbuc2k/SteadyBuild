@@ -1,5 +1,7 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+using SteadyBuild;
 using SteadyBuild.Abstractions;
+using SteadyBuild.Agent;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -7,65 +9,72 @@ using System.Text;
 namespace BuildRunnerTests
 {
     [TestClass]
-    public class BuildCycleTests
+    public class BuildAgentTests
     {
+        private const string Agent_Ident = "Test-Agent1";
 
-        public static IEnumerable<BuildProjectConfiguration> GetProjects()
+        private BuildProjectConfiguration _testProject = new BuildProjectConfiguration()
         {
-            yield return new BuildProjectConfiguration()
+            Name = "NetCoreTestLibrary",
+            ProjectID = Guid.NewGuid(),
+            RepositoryType = "git",
+            RepositoryPath = "https://www.example.com/TestProject1.git",
+            RepositorySettings = new Dictionary<string, string>()
             {
-                Name = "NetCoreTestLibrary",
-                RepositoryType = "git",
-                RepositoryPath = "https://www.example.com/TestProject1.git",
-                RepositorySettings = new Dictionary<string, string>()
+                { "Username", "justin" },
+                { "Password", "P@ssword123" }
+            },
+            Contacts = new BuildProjectContact[] {
+                new BuildProjectContact()
                 {
-                    { "Username", "justin" },
-                    { "Password", "P@ssword123" }
-                },
-                Contacts = new string[] { "justin@example.com" },
-                BlameTheAuthor = true,
-                NotifyTheAuthor = true,
-                PraiseTheAuthor = true,
-                AssetPaths = new string[]
-                {
-                    "\\**\\bin\\$(Configuration)\\*.nupkg",
-                },
-                Variables = new Dictionary<string, string>()
-                {
-                    { "DeployPath", "" },
-                    { "BAR", "456" }
-                },
-                Tasks = new string[]
-                {
-                    "build.cmd"
+                    Name = "Justin",
+                    Email = "justin@example.com",
+                    ProjectContactID = Guid.NewGuid(),
+                    RepositoryUsername = "justin"
                 }
-            };
-        }
-
-        [TestMethod]
-        public void TestReadFromStdOutAndError()
-        {
-            var output = new System.Text.StringBuilder();
-            var errorOutput = new System.Text.StringBuilder();
-            int lineCount = 0;
-            int errorCount = 0;
-           
-            int exitCode1 = SteadyBuild.Abstractions.ProcessUtils.StartProcessAsync("powershell.exe", "-Command \"&{ for ($i = 1; $i -le 500; $i++) { Write-Output 'Blah blah blah this is some out text that will be written.' ; [Console]::Error.WriteLine('Blah blah blah this is some error text that will be written.') }}\"",
-                output: (val) =>
+            },
+            BlameTheAuthor = true,
+            NotifyTheAuthor = true,
+            PraiseTheAuthor = true,
+            AssetPaths = new string[]
+            {
+                "\\**\\bin\\$(Configuration)\\*.nupkg",
+            },
+            Variables = new Dictionary<string, string>()
+            {
+                { "DeployPath", "" },
+                { "BAR", "456" }
+            },
+            Tasks = new BuildTaskCommand[]
+            {
+                new BuildTaskCommand()
                 {
-                    lineCount++;
-                    output.AppendLine(val);
-                },
-                errorOutput: (val) =>
-                {
-                    errorCount++;
-                    errorOutput.AppendLine(val);
+                    CommandText = "ping.exe localhost",
+                    TypeName = "Build",
+                    SuccessExitCodes = new int[]{ 0 },
+                    TaskNumber = 1
                 }
-            ).Result;
+            }
+        };
+        private Mock.MockBuildQueue _queue;
+        private IProjectRepository _repository;
+        private System.IO.TextWriter _output;
+        private BuildAgent _agent;
 
-            Assert.AreEqual(0, exitCode1);
-            Assert.AreEqual(500, lineCount);
-            Assert.AreEqual(500, errorCount);
-        }
+        //[ClassInitialize]
+        //public void SetupAgent()
+        //{
+        //    var agentOptions = new BuildAgentOptions();
+        //    agentOptions.AgentIdentifier = Agent_Ident;
+        //    agentOptions.ConcurrentBuilds = 1;
+        //    agentOptions.WorkingPath = "%TEMP%\\SteadyBuild";
+
+        //    _queue = new Mock.MockBuildQueue();
+        //    _output = new System.IO.StreamWriter(new System.IO.MemoryStream());
+        //    _agent = new BuildAgent(_output, _queue, _repository, agentOptions);
+        //}
+
+
+
     }
 }

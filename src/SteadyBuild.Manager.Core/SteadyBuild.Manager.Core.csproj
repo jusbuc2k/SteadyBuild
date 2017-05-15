@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard1.6</TargetFramework>
+    <AssemblyName>SteadyBuild.Manager.Core</AssemblyName>
+    <RootNamespace>SteadyBuild.Manager</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Dapper" Version="1.50.2" />
+    <PackageReference Include="Dapper.Contrib" Version="1.50.0" />
+    <PackageReference Include="Microsoft.Data.SQLite" Version="1.1.0" />
+    <PackageReference Include="System.Data.Common" Version="4.3.0" />
+    <PackageReference Include="System.Data.SqlClient" Version="4.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SteadyBuild.Abstractions\SteadyBuild.Abstractions.csproj" />
+    <ProjectReference Include="..\SteadyBuild.Common\SteadyBuild.Common.csproj" />
+    <ProjectReference Include="..\SteadyBuild.Extensions.Svn\SteadyBuild.Extensions.Svn.csproj" />
+  </ItemGroup>
+
+</Project>

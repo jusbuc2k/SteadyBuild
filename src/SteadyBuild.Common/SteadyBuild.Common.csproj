@@ -11,6 +11,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="10.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\SteadyBuild.Abstractions\SteadyBuild.Abstractions.csproj" />
     <ProjectReference Include="..\SteadyBuild.Extensions.Svn\SteadyBuild.Extensions.Svn.csproj" />
   </ItemGroup>

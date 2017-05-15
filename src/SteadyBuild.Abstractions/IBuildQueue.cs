@@ -1,11 +1,15 @@
-﻿using System;
+﻿using SteadyBuild.Abstractions;
+using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading.Tasks;
 
-namespace SteadyBuild.Abstractions
+namespace SteadyBuild
 {
     public interface IBuildQueue
     {
-        IDisposable Subscribe(string agentIdentifier, Action<BuildQueueEntry> onBuildQueued);
+        Task<Guid> EnqueBuild(BuildQueueEntry entry);
+
+        Task<IEnumerable<BuildQueueEntry>> DequeueBuilds(Guid agentIdentifier);
     }
 }

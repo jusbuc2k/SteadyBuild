@@ -1,0 +1,14 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp1.1</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\src\SteadyBuild.Abstractions\SteadyBuild.Abstractions.csproj" />
+    <ProjectReference Include="..\src\SteadyBuild.Common\SteadyBuild.Common.csproj" />
+    <ProjectReference Include="..\src\SteadyBuild.Manager.Core\SteadyBuild.Manager.Core.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -17,7 +17,7 @@ namespace BuildRunnerTests
         public void TestSvnGetInfo()
         {
             var project = new BuildProjectConfiguration();
-            var svn = new SteadyBuildSvnCodeRepository(project);
+            var svn = new SteadyBuild.Extensions.Svn.SvnCodeRepository(project);
 
             project.RepositoryPath = REPO_PATH;
 
@@ -32,7 +32,7 @@ namespace BuildRunnerTests
         public void TestSvnGetDiff()
         {
             var project = new BuildProjectConfiguration();
-            var svn = new SvnCodeRepository(project);            
+            var svn = new SteadyBuild.Extensions.Svn.SvnCodeRepository(project);            
 
             project.RepositoryPath = REPO_PATH;
 
