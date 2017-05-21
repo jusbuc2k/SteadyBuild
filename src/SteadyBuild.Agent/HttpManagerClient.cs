@@ -22,16 +22,16 @@ namespace SteadyBuild.Agent
             //_client.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"))
         }
 
-        public string AgentIdentifier { get; set; }
-
         protected string BuildRequestUrl(string path)
         {
             return string.Concat(_endpointAddress, "/", path);
         }
 
-        public Task<BuildProjectConfiguration> GetProject(Guid projectID)
+        public async Task<BuildProjectConfiguration> GetProject(Guid projectID)
         {
-            throw new NotImplementedException();
+            var response = await _client.GetAsync($"api/Project/{projectID}");
+
+            return await response.Content.ReadJsonAsAsync<BuildProjectConfiguration>();
         }
 
         public async Task<BuildProjectState> GetProjectState(Guid projectIdentifier)
@@ -41,7 +41,9 @@ namespace SteadyBuild.Agent
 
         public async Task<IEnumerable<Guid>> GetProjectsByTriggerMethodAsync(BuildTriggerMethod method)
         {
-            throw new NotImplementedException();
+            var response = await _client.GetAsync($"api/Projects/ByTriggerMethod/{method.ToString()}");
+
+            return await response.Content.ReadJsonAsAsync<IEnumerable<Guid>>();
         }
 
         public async Task SetProjectState(Guid projectIdentifier, BuildProjectState updatedState)
@@ -60,7 +62,7 @@ namespace SteadyBuild.Agent
             throw new NotImplementedException();
         }
 
-        public async Task<IEnumerable<BuildQueueEntry>> WaitForJobsAsync()
+        public async Task<IEnumerable<BuildQueueEntry>> WaitForJobsAsync(string agentIdentifier)
         {
             //TODO: these should be passed in
             var cancelTokenSource = new System.Threading.CancellationTokenSource();
@@ -70,7 +72,7 @@ namespace SteadyBuild.Agent
             {
                 try
                 {
-                    var response = await _client.GetAsync(BuildRequestUrl($"api/DequeueJobs/{this.AgentIdentifier}"));
+                    var response = await _client.GetAsync(BuildRequestUrl($"api/DequeueJobs/{agentIdentifier}"));
 
                     response.EnsureSuccessStatusCode();
 
@@ -78,6 +80,7 @@ namespace SteadyBuild.Agent
 
                     if (queueEntries == null || queueEntries.Count() == 0)
                     {
+                        System.Threading.Thread.Sleep(_pollingInterval);
                         continue;
                     }
 
@@ -87,8 +90,6 @@ namespace SteadyBuild.Agent
                 {
                     throw ex;
                 }
-
-                System.Threading.Thread.Sleep(_pollingInterval);
             }
 
             return Enumerable.Empty<BuildQueueEntry>();

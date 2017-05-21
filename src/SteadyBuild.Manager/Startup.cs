@@ -32,7 +32,7 @@ namespace SteadyBuild.Manager
             // Add framework services.
             services.AddMvc();
 
-            services.AddSingleton<IProjectRepository>((sp) =>
+            services.AddScoped<IProjectRepository>((sp) =>
             {
                 var connection = new System.Data.SqlClient.SqlConnection(this.Configuration.GetSection("ConnectionStrings")["Manager"]);
 

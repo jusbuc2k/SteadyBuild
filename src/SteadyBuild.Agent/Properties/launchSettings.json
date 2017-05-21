@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "SteadyBuild.Agent": {
+      "commandName": "Project",
+      "commandLineArgs": "-q http://localhost:50134/ -i test"
+    }
+  }
+}

@@ -29,9 +29,9 @@ namespace SteadyBuild.Agent
         /// </summary>
         /// <param name="projectQueue"></param>
         /// <returns></returns>
-        public async Task ProcessQueueAsync(System.Collections.Concurrent.ConcurrentQueue<BuildJob> projectQueue)
+        public async Task ProcessQueueAsync(System.Collections.Concurrent.ConcurrentQueue<LocalQueuedJob> projectQueue)
         {
-            BuildJob buildJob;
+            LocalQueuedJob buildJob;
 
             while (projectQueue.TryDequeue(out buildJob))
             {
@@ -67,8 +67,10 @@ namespace SteadyBuild.Agent
 
                     environment.AddCodeInfoVariables(codeInfo);
 
+                    // export the code into the working code folder
                     await codeRepo.Export(buildJob.Configuration.RepositoryPath, buildJob.RevisionIdentifier, environment.CodePath);
 
+                    // run each build task in order
                     var buildResult = await buildJob.Configuration.Tasks.RunAllAsync(environment);
 
                     if (buildResult.Success)

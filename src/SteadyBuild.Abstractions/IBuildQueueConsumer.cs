@@ -7,6 +7,6 @@ namespace SteadyBuild.Abstractions
 {
     public interface IBuildQueueConsumer
     {
-        Task<IEnumerable<BuildQueueEntry>> WaitForJobsAsync();
+        Task<IEnumerable<BuildQueueEntry>> WaitForJobsAsync(string agentIdentifier);
     }
 }

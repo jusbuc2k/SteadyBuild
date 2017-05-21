@@ -53,7 +53,7 @@ namespace SteadyBuild.Abstractions
 
         public int MaxFailureCount { get; set; } = 3;
 
-        public ICollection<BuildTaskCommand> Tasks { get; set; }
+        public IList<BuildTask> Tasks { get; set; }
 
         public bool IsActive { get; set; }
 

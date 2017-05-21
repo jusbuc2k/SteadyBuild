@@ -14,7 +14,7 @@ CREATE TABLE dbo.Agent (
 	[Name] nvarchar(100) NOT NULL,
 	[ApiKey] varbinary(32) NOT NULL,
 	[IsActive] bit NOT NULL,
-	[EnvironmentID] int NOT NULL,
+	[EnvironmentID] uniqueidentifier NOT NULL,
 	CONSTRAINT PK_Agent PRIMARY KEY CLUSTERED ([AgentID]),
 	CONSTRAINT UQ_Agent_Name UNIQUE ([Name]),
 	CONSTRAINT FK_Agent_Environment FOREIGN KEY ([EnvironmentID]) REFERENCES dbo.Environment ([EnvironmentID])
@@ -48,7 +48,7 @@ CREATE TABLE dbo.Project (
 );
 GO
 
-CREATE INDEX IX_Project_Environment ON dbo.Project ([Environment]);
+CREATE INDEX IX_Project_EnvironmentID ON dbo.Project ([EnvironmentID]);
 GO
 
 CREATE TABLE dbo.ProjectContact (
@@ -83,7 +83,7 @@ CREATE INDEX IX_ProjectSetting_ProjectID ON dbo.ProjectSetting ([ProjectID]);
 GO
 
 CREATE TABLE dbo.ProjectAsset (
-	[ProjetAssetID] int IDENTITY(1,1) NOT NULL,
+	[ProjectAssetID] int IDENTITY(1,1) NOT NULL,
 	[ProjectID] uniqueidentifier,
 	[Path] nvarchar(max) NOT NULL,
 	CONSTRAINT PK_ProjectAsset PRIMARY KEY CLUSTERED ([ProjectAssetID]),
@@ -97,8 +97,8 @@ GO
 CREATE TABLE dbo.ProjectTask (
 	[ProjectID] uniqueidentifier NOT NULL,
 	[TaskNumber] int NOT NULL,
-	[TaskType] varchar(15) NOT NULL, -- Build, Test, Deploy
-	[CommandText] nvarchar(max) NOT NULL,
+	[CategoryName] varchar(15) NOT NULL, -- Build, Test, Deploy
+	[Expression] nvarchar(max) NOT NULL,
 	[SuccessExitCodes] varchar(100) NOT NULL, -- CSV list of exit codes
 	CONSTRAINT PK_ProjectTask PRIMARY KEY CLUSTERED ([ProjectID],[TaskNumber]),
 	CONSTRAINT FK_ProjectTask FOREIGN KEY ([ProjectID]) REFERENCES dbo.[Project] ([ProjectID])
@@ -130,6 +130,7 @@ CREATE TABLE dbo.BuildQueue (
 	[AssignedDateTime] datetimeoffset NULL,
 	[AssignedAgentID] uniqueidentifier  NULL,
 	[CompleteDateTime] datetimeoffset NULL,
+	[Status] tinyint NOT NULL, --1 = queueud, 2 = running, 3 = done
 	CONSTRAINT PK_BuildQueue PRIMARY KEY ([BuildQueueID]),
 	CONSTRAINT FK_BuildQueue_Project FOREIGN KEY ([ProjectID]) REFERENCES dbo.Project ([ProjectID]),
 	CONSTRAINT FK_BuildQueue_Agent FOREIGN KEY ([AssignedAgentID]) REFERENCES dbo.Agent ([AgentID])
@@ -146,7 +147,7 @@ CREATE TABLE dbo.BuildLog (
 	[MessageNumber] int NOT NULL,
 	[Severity] int NOT NULL,
 	[Message] nvarchar(max) NULL,
-	CONSTRAINT PK_BuildLog PRIMARY KEY CLUSTERED ([ProjectID],[BuildNumber],[MessageNumber]),
+	CONSTRAINT PK_BuildLog PRIMARY KEY CLUSTERED ([ProjectID],[BuildQueueID],[MessageNumber]),
 	CONSTRAINT FK_BuildLog_Project FOREIGN KEY ([ProjectID]) REFERENCES dbo.Project([ProjectID]),
 );
 GO

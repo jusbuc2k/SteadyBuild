@@ -67,7 +67,7 @@ namespace SteadyBuild.Abstractions
 
             result.ExitCode = exitCode;
             result.Success = this.SuccessfulExitCodes.Contains(exitCode);
-
+            
             return result;
         }
     }

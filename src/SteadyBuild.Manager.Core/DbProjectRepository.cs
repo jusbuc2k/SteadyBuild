@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 
 namespace SteadyBuild.Manager
 {
-    public class DbProjectRepository : IProjectRepository, IBuildQueue
+    public class DbProjectRepository : IProjectRepository, IBuildQueue, IDisposable
     {
         public DbProjectRepository(IDbConnection connection)
         {
@@ -20,8 +20,18 @@ namespace SteadyBuild.Manager
 
         protected IDbConnection Connection { get; private set; }
 
+        protected void EnsureOpenConnection()
+        {
+            if (this.Connection.State != ConnectionState.Open)
+            {
+                this.Connection.Open();
+            }
+        }
+
         public async Task AddProjectAsync(BuildProjectConfiguration project)
         {
+            this.EnsureOpenConnection();
+
             var projectData = new DbProjectRecord(project);
 
             using (var transaction = this.Connection.BeginTransaction())
@@ -74,9 +84,9 @@ namespace SteadyBuild.Manager
 
                 if (project.Tasks != null)
                 {
-                    foreach (var task in project.Tasks)
+                    for (int taskNo = 1; taskNo <= project.Tasks.Count; taskNo++)
                     {
-                        await this.Connection.InsertAsync(new DbProjectTaskRecord(projectData.ProjectID, task));
+                        await this.Connection.InsertAsync(new DbProjectTaskRecord(projectData.ProjectID, project.Tasks[taskNo-1], taskNo));
                     }
                 }
 
@@ -86,6 +96,8 @@ namespace SteadyBuild.Manager
 
         public async Task UpdateProjectAsync(BuildProjectConfiguration project)
         {
+            this.EnsureOpenConnection();
+
             var projectData = new DbProjectRecord(project);
 
             using (var transaction = this.Connection.BeginTransaction())
@@ -111,6 +123,8 @@ namespace SteadyBuild.Manager
 
         public async Task<BuildProjectConfiguration> GetProject(Guid projectIdentifier)
         {
+            this.EnsureOpenConnection();
+
             var param = new
             {
                 ProjectID = projectIdentifier
@@ -177,12 +191,9 @@ namespace SteadyBuild.Manager
                 }
             }
 
-            bp.Tasks = new List<BuildTaskCommand>(tasks.Select(s => new BuildTaskCommand()
+            bp.Tasks = new List<BuildTask>(tasks.Select(s => new BuildTask(s.Expression)
             {
-                CommandText = s.CommandText,
-                TaskNumber = s.TaskNumber,
-                SuccessExitCodes = s.SuccessExitCodes.Split(',').Select(c => int.Parse(c)),
-                TypeName = s.TypeName
+                SuccessfulExitCodes = s.SuccessExitCodes.Split(',').Select(c => int.Parse(c)),
             }));
 
             return bp;
@@ -190,6 +201,8 @@ namespace SteadyBuild.Manager
 
         public async Task<IEnumerable<Guid>> GetProjectsByTriggerMethodAsync(BuildTriggerMethod method)
         {
+            this.EnsureOpenConnection();
+
             return await this.Connection.QueryAsync<Guid>(@"
                 SELECT ProjectID 
                 FROM Projects 
@@ -212,9 +225,11 @@ namespace SteadyBuild.Manager
             throw new NotImplementedException();
         }
 
-        public async Task<IEnumerable<BuildQueueEntry>> DequeueBuilds(Guid agentIdentifier)
+        public async Task<IEnumerable<BuildQueueEntry>> DequeueBuilds(string agentIdentifier)
         {
-            var queue = await this.Connection.QueryAsync<dynamic>("SELECT ProjectID,CreateDateTime,BuildQueueID FROM BuildQueue WHERE AssignedAgentID = @Method AND IsActive = 1 ORDER BY Name;", param: new
+            this.EnsureOpenConnection();
+
+            var queue = await this.Connection.QueryAsync<dynamic>("SELECT ProjectID,CreateDateTime,BuildQueueID FROM BuildQueue WHERE AssignedAgentID = @AgentID AND [Status] = 1;", param: new
             {
                 AgentID = agentIdentifier
             });
@@ -239,6 +254,8 @@ namespace SteadyBuild.Manager
 
         public async Task<Guid> EnqueBuild(BuildQueueEntry entry)
         {
+            this.EnsureOpenConnection();
+
             var agentQuery = @"
                 SELECT TOP 1 A.AgentID, P.NextBuildNumber
                 FROM Project P 
@@ -280,6 +297,14 @@ namespace SteadyBuild.Manager
         public Task<IBuildOutputWriter> GetMessageWriterAsync(Guid projectIdentifier, Guid buildIdentifier)
         {
             throw new NotImplementedException();
+        }
+
+        public void Dispose()
+        {
+            if (this.Connection.State != ConnectionState.Closed)
+            {
+                this.Connection.Close();
+            }
         }
     }
 }

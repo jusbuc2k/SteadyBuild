@@ -45,14 +45,11 @@ namespace BuildRunnerTests
                 { "DeployPath", "" },
                 { "BAR", "456" }
             },
-            Tasks = new BuildTaskCommand[]
+            Tasks = new BuildTask[]
             {
-                new BuildTaskCommand()
+                new BuildTask("ping.exe localhost")
                 {
-                    CommandText = "ping.exe localhost",
-                    TypeName = "Build",
-                    SuccessExitCodes = new int[]{ 0 },
-                    TaskNumber = 1
+                    SuccessfulExitCodes = new int[]{ 0 },
                 }
             }
         };

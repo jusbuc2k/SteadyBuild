@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SteadyBuild
+namespace SteadyBuild.Agent
 {
     public static class Extensions
     {

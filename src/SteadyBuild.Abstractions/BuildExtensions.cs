@@ -14,18 +14,13 @@ namespace SteadyBuild
         /// </summary>
         /// <param name="environment"></param>
         /// <returns></returns>
-        public static async Task<BuildResult> RunAllAsync(this IEnumerable<BuildTaskCommand> tasks, BuildEnvironment environment)
+        public static async Task<BuildResult> RunAllAsync(this IEnumerable<BuildTask> tasks, BuildEnvironment environment)
         {
-            foreach (var task in tasks.OrderBy(o => o.TaskNumber))
+            foreach (var task in tasks)
             {
-                environment.WriteMessage(MessageSeverity.Info, $"Executing task: ${task.CommandText}");
+                environment.WriteMessage(MessageSeverity.Info, $"Executing task: ${task.Expression}");
 
-                var taskRunner = new BuildTask(task.CommandText)
-                {
-                    SuccessfulExitCodes = task.SuccessExitCodes
-                };
-
-                var taskResult = await taskRunner.RunAsync(environment);
+                var taskResult = await task.RunAsync(environment);
 
                 if (!taskResult.Success)
                 {
@@ -35,6 +30,5 @@ namespace SteadyBuild
 
             return new BuildResult(0);
         }
-
     }
 }

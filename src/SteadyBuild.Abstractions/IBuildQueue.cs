@@ -10,6 +10,6 @@ namespace SteadyBuild
     {
         Task<Guid> EnqueBuild(BuildQueueEntry entry);
 
-        Task<IEnumerable<BuildQueueEntry>> DequeueBuilds(Guid agentIdentifier);
+        Task<IEnumerable<BuildQueueEntry>> DequeueBuilds(string agentIdentifier);
     }
 }

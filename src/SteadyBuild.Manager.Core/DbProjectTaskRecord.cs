@@ -1,4 +1,5 @@
 ﻿using Dapper.Contrib.Extensions;
+using SteadyBuild.Abstractions;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -14,12 +15,11 @@ namespace SteadyBuild.Manager
 
         }
 
-        public DbProjectTaskRecord(Guid projectID, BuildTaskCommand command)
+        public DbProjectTaskRecord(Guid projectID, BuildTask task, int taskNumber)
         {
             this.ProjectID = projectID;
-            this.CommandText = command.CommandText;
-            this.TypeName = command.TypeName;
-            this.SuccessExitCodes = string.Join(",", command.SuccessExitCodes);
+            this.Expression = task.Expression;
+            this.SuccessExitCodes = string.Join(",", task.SuccessfulExitCodes);
         }
 
         [ExplicitKey]
@@ -28,9 +28,9 @@ namespace SteadyBuild.Manager
         [ExplicitKey]
         public int TaskNumber { get; set; }
 
-        public string TypeName { get; set; }
+        public string CategoryName { get; set; }
 
-        public string CommandText { get; set; }
+        public string Expression { get; set; }
 
         public string SuccessExitCodes { get; set; }
     }

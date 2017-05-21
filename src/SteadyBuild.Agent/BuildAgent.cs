@@ -9,7 +9,7 @@ namespace SteadyBuild.Agent
 {
     public class BuildAgent
     {
-        private readonly System.Collections.Concurrent.ConcurrentQueue<BuildJob> _localQueue;
+        private readonly System.Collections.Concurrent.ConcurrentQueue<LocalQueuedJob> _localQueue;
 
         public BuildAgent(BuildAgentOptions agentOptions, IProjectRepository repository, IBuildQueueConsumer queue, ILogger logger)
         {
@@ -17,7 +17,7 @@ namespace SteadyBuild.Agent
             this.Queue = queue;
             this.Logger = logger;
             this.AgentOptions = agentOptions;
-            _localQueue = new System.Collections.Concurrent.ConcurrentQueue<BuildJob>();
+            _localQueue = new System.Collections.Concurrent.ConcurrentQueue<LocalQueuedJob>();
         }
 
         protected BuildAgentOptions AgentOptions { get; private set; }
@@ -64,16 +64,18 @@ namespace SteadyBuild.Agent
 
         protected async Task WaitForJobsAsync()
         {
-            var builds = await this.Queue.WaitForJobsAsync();
+            var builds = await this.Queue.WaitForJobsAsync(this.AgentOptions.AgentIdentifier);
 
             await this.Logger.LogInfoAsync($"{builds.Count()} projects were received from the build queue for processing.");
 
             foreach (var queueEntry in builds)
             {
-                _localQueue.Enqueue(new BuildJob(queueEntry.RevisionIdentifier,
-                    await this.Repository.GetProject(queueEntry.ProjectIdentifier),
-                    await this.Repository.GetMessageWriterAsync(queueEntry.ProjectIdentifier, queueEntry.BuildIdentifier)
-                ));
+                _localQueue.Enqueue(new LocalQueuedJob()
+                {
+                    RevisionIdentifier = queueEntry.RevisionIdentifier,
+                    Configuration = await this.Repository.GetProject(queueEntry.ProjectIdentifier),
+                    Output = await this.Repository.GetMessageWriterAsync(queueEntry.ProjectIdentifier, queueEntry.BuildIdentifier)
+                });
             }
         }
 

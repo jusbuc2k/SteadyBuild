@@ -25,5 +25,7 @@ namespace SteadyBuild.Manager
 
         public string RevisionIdentifier { get; set; }
 
+        public byte Status { get; set; }
+
     }
 }

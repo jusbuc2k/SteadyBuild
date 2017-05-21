@@ -20,12 +20,16 @@ namespace SteadyBuild.Manager.Controllers
         public ApiController(IProjectRepository repository)
         {
             _repository = repository;
+            //TODO: Not this. It's stupid. What to do instead?
+            _queue = repository as DbProjectRepository;
         }
+
+        #region Queue Methods
 
         [Route("DequeueJobs/{agentIdentifier}")]
         public async Task<IEnumerable<BuildQueueEntry>> DequeueJobs(string agentIdentifier)
         {
-            return await _queue.DequeueBuilds(Guid.Parse(agentIdentifier));
+            return await _queue.DequeueBuilds(agentIdentifier);
         }
 
         [Route("EnqueueJob/{projectId}")]
@@ -35,6 +39,27 @@ namespace SteadyBuild.Manager.Controllers
             _queue.EnqueBuild(entry);
 
             return Task.CompletedTask;
+        }
+
+        #endregion
+
+        [Route("Project/{projectID}")]
+        public async Task<BuildProjectConfiguration> GetProject(Guid projectID)
+        {
+            return await _repository.GetProject(projectID);
+        }
+
+        [Route("Projects/ByTriggerMethod/{method}")]
+        public async Task<IEnumerable<Guid>> GetProjectsByTriggerMethod(string method)
+        {
+            if (System.Enum.TryParse(method, out BuildTriggerMethod methodEnum))
+            {
+                return await _repository.GetProjectsByTriggerMethodAsync(methodEnum);
+            }
+            else
+            {
+                throw new Exception("Bad request");
+            }
         }
 
         [HttpPost]

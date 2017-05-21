@@ -34,7 +34,7 @@ namespace SteadyBuild
             return responseContent.BuildQueueID;
         }
 
-        public async Task<IEnumerable<BuildQueueEntry>> DequeueBuilds(Guid agentIdentifier)
+        public async Task<IEnumerable<BuildQueueEntry>> DequeueBuilds(string agentIdentifier)
         {
             var result = await _client.GetAsync($"api/DequeueJobs/{agentIdentifier}");
 
