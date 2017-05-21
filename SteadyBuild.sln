@@ -17,7 +17,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SteadyBuild.Manager", "src\
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SteadyBuild.Manager.Core", "src\SteadyBuild.Manager.Core\SteadyBuild.Manager.Core.csproj", "{16B54DA7-3A31-4A81-8536-76C1EC466659}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SteadyBuild.Poller", "SteadyBuild.Poller\SteadyBuild.Poller.csproj", "{A7EB23A6-BA6B-49D0-B7F1-738FC909EE02}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SteadyBuild.Poller", "src\SteadyBuild.Poller\SteadyBuild.Poller.csproj", "{A7EB23A6-BA6B-49D0-B7F1-738FC909EE02}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
