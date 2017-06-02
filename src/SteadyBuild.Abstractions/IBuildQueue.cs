@@ -8,7 +8,7 @@ namespace SteadyBuild
 {
     public interface IBuildQueue
     {
-        Task<Guid> EnqueBuild(BuildQueueEntry entry);
+        Task<Guid> EnqueueBuild(BuildQueueEntry entry);
 
         Task<IEnumerable<BuildQueueEntry>> DequeueBuilds(string agentIdentifier);
     }

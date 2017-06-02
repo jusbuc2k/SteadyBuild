@@ -30,11 +30,34 @@ namespace SteadyBuild.Extensions.Svn
             }            
         }
 
-        protected async Task<System.Xml.Linq.XDocument> ExecuteSvnCommand(string command, string options, string arguments)
+        protected async Task<System.Xml.Linq.XDocument> ExecuteXml(string command, string options, string arguments)
         {
             var commandText = new StringBuilder();
 
             commandText.Append(command).Append(" --xml");
+
+            options = string.Concat("--xml ", options);
+
+            if (!string.IsNullOrEmpty(arguments))
+            {
+                commandText.Append(" ").Append(arguments);
+            }
+
+            var result = await ExecuteCommand(command, options, arguments);
+
+            if (result.Item1 != 0)
+            {
+                throw new Exception($"The SVN command {command} {arguments} exited with code {result.Item1}.");
+            }
+
+            return System.Xml.Linq.XDocument.Load(new System.IO.StringReader(result.Item2));
+        }
+
+        protected async Task<Tuple<int, string>> ExecuteCommand(string command, string options, string arguments)
+        {
+            var commandText = new StringBuilder();
+
+            commandText.Append(command);
 
             if (!string.IsNullOrEmpty(options))
             {
@@ -56,14 +79,18 @@ namespace SteadyBuild.Extensions.Svn
                 commandText.Append(" ").Append(arguments);
             }
 
-            var sb = new System.Text.StringBuilder();
+            var outText = new System.Text.StringBuilder();
+            var errText = new System.Text.StringBuilder();
 
             int exitCode = await ProcessUtils.StartProcessAsync(_exePath, commandText.ToString(), output: (line) =>
             {
-                sb.AppendLine(line);
+                outText.AppendLine(line);
+            }, errorOutput: (line) =>
+            {
+                errText.AppendLine(line);
             });
 
-            return System.Xml.Linq.XDocument.Load(new System.IO.StringReader(sb.ToString()));
+            return new Tuple<int, string>(exitCode, outText.ToString());
         }
 
         public async Task<int> Export(string path, string revisionIdentifier, string targetPath)
@@ -73,7 +100,7 @@ namespace SteadyBuild.Extensions.Svn
                 throw new ArgumentNullException(nameof(path));
             }
 
-            await this.ExecuteSvnCommand("export", "", $"\"{path}@{revisionIdentifier}\" \"{targetPath}\"");
+            await this.ExecuteCommand("export", "--force", $"\"{path}@{revisionIdentifier}\" \"{targetPath}\"");
 
             return 0;
         }
@@ -85,7 +112,7 @@ namespace SteadyBuild.Extensions.Svn
                 throw new ArgumentNullException(nameof(path));
             }
 
-            var diffResult = await this.ExecuteSvnCommand("diff", "--summarize", $"{_project.RepositoryPath}@{revisionIdentifierA} {_project.RepositoryPath}@{revisionIdentifierB}");
+            var diffResult = await this.ExecuteXml("diff", "--summarize", $"{_project.RepositoryPath}@{revisionIdentifierA} {_project.RepositoryPath}@{revisionIdentifierB}");
             var fileList = diffResult.Descendants("path").Select(s => s.Value.Substring(path.Length).TrimStart('/'));
 
             if (diffResult != null)
@@ -97,7 +124,6 @@ namespace SteadyBuild.Extensions.Svn
                 return Enumerable.Empty<string>();
             }
         }
-
 
         public Task<CodeRepositoryInfo> GetInfo(string path)
         {
@@ -116,7 +142,7 @@ namespace SteadyBuild.Extensions.Svn
                 throw new ArgumentNullException(nameof(revisionIdentifier));
             }
 
-            var info = await this.ExecuteSvnCommand("info", "", $"{path}@{revisionIdentifier}");
+            var info = await this.ExecuteXml("info", "", $"{path}@{revisionIdentifier}");
 
             if (info == null)
             {
@@ -124,7 +150,9 @@ namespace SteadyBuild.Extensions.Svn
             }
 
             var result = new CodeRepositoryInfo();
-            var revisionAttribute = info.Descendants("entry").Select(s => s.Attribute("revision")).SingleOrDefault();
+            var revisionAttribute = info.Descendants("entry")
+                .Select(s => s.Attribute("revision"))
+                .SingleOrDefault();
             
             if (revisionAttribute != null)
             {
@@ -141,7 +169,7 @@ namespace SteadyBuild.Extensions.Svn
             if (_project.RepositorySettings.ContainsKey("compat") && _project.RepositorySettings["compat"] == "github")
             {
                 // svn propget git-commit --revprop -r $newRev $url
-                var gitInfo = await this.ExecuteSvnCommand("propget git-commit", $"--revprop -r {result.RevisionIdentifier}", path);
+                var gitInfo = await this.ExecuteXml("propget git-commit", $"--revprop -r {result.RevisionIdentifier}", path);
                 var commitHash = gitInfo.Descendants("property")
                     .Where(x => x.Attribute("name").Value == "git-commit")
                     .Select(s => s.Value)

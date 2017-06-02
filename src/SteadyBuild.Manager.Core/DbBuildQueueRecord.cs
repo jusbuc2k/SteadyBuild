@@ -27,5 +27,15 @@ namespace SteadyBuild.Manager
 
         public byte Status { get; set; }
 
+        /// <summary>
+        /// Gets or sets the date/time when the lock to a particular agent expires
+        /// </summary>
+        public DateTimeOffset LockExpiresDateTime { get; set; }
+
+        public int? LastResultCode { get; set; }
+
+        public DateTimeOffset? LastResultDateTime { get; set; }
+
+        public int FailCount { get; set; } = 0;
     }
 }

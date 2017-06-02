@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace BuildRunnerTests.Mock
 {
-    public class MockBuildOutputWriter : IBuildOutputWriter
+    public class MockBuildOutputWriter : ILogger
     {
         public MockBuildOutputWriter()
         {

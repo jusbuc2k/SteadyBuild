@@ -35,7 +35,7 @@ namespace SteadyBuild
         {
             if (this.IsEnabled(severity))
             {
-                await _writer.WriteAsync($"{DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss")} {severity.ToString().ToUpper()} {message}");
+                await _writer.WriteLineAsync($"{DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss")} {severity.ToString().ToUpper()} {message}");
 
                 // I'm intentioanlly not awaiting this
                 _writer.FlushAsync();

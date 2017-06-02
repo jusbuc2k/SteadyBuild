@@ -132,11 +132,11 @@ namespace SteadyBuild.Manager
 
             var commandText = new StringBuilder();
 
-            commandText.AppendLine("SELECT * FROM Project WHERE ProjectID = ?;");
-            commandText.AppendLine("SELECT * FROM ProjectContact WHERE ProjectID = ?;");
-            commandText.AppendLine("SELECT * FROM ProjectTask WHERE ProjectID = ? ORDER BY TaskNumber;");
-            commandText.AppendLine("SELECT * FROM ProjectAsset WHERE ProjectID = ? ORDER BY [Path];");
-            commandText.AppendLine("SELECT * FROM ProjectSetting WHERE ProjectID = ? ORDER BY [TypeName]");
+            commandText.AppendLine("SELECT * FROM Project WHERE ProjectID = @ProjectID;");
+            commandText.AppendLine("SELECT * FROM ProjectContact WHERE ProjectID = @ProjectID;");
+            commandText.AppendLine("SELECT * FROM ProjectTask WHERE ProjectID = @ProjectID ORDER BY TaskNumber;");
+            commandText.AppendLine("SELECT * FROM ProjectAsset WHERE ProjectID = @ProjectID ORDER BY [Path];");
+            commandText.AppendLine("SELECT * FROM ProjectSetting WHERE ProjectID = @ProjectID ORDER BY [TypeName]");
 
             var result = await this.Connection.QueryMultipleAsync(commandText.ToString(), param: param);
 
@@ -199,104 +199,219 @@ namespace SteadyBuild.Manager
             return bp;
         }
 
-        public async Task<IEnumerable<Guid>> GetProjectsByTriggerMethodAsync(BuildTriggerMethod method)
+        public async Task<IEnumerable<Guid>> GetProjectsToPollForChanges()
         {
             this.EnsureOpenConnection();
 
+            // Get a list of polled projects not already in the queue
             return await this.Connection.QueryAsync<Guid>(@"
                 SELECT ProjectID 
-                FROM Projects 
-                WHERE TriggerMethod = @Method AND IsActive = 1
+                FROM Project
+                WHERE TriggerMethod = @TriggerMethod AND IsActive = 1
+                    AND NOT EXISTS (SELECT 1 FROM BuildQueue 
+                        WHERE ProjectID = Project.ProjectID AND [Status] IN (1,2)
+                        )
                 ORDER BY Name;", 
                 param: new
                 {
-                    TriggerMethod = (byte)method
+                    TriggerMethod = (byte)BuildTriggerMethod.Polling
                 }
             );
         }
 
-        public Task<BuildProjectState> GetProjectState(Guid projectIdentifier)
+        public async Task<BuildQueueEntry> GetMostRecentBuildAsync(Guid projectIdentifier)
         {
-            throw new NotImplementedException();
+            this.EnsureOpenConnection();
+
+            return await this.Connection.QuerySingleOrDefaultAsync<BuildQueueEntry>(@"
+                SELECT TOP 1 *
+                FROM [BuildQueue]
+                WHERE [ProjectID] = @ProjectID
+                ORDER BY [CreateDateTime] DESC
+            ", param: new
+            {
+                ProjectID = projectIdentifier
+            });
         }
 
-        public Task SetProjectState(Guid projectIdentifier, BuildProjectState state)
+        public async Task SetBuildResultAsync(Guid buildQueueID, BuildResult result)
         {
-            throw new NotImplementedException();
+            this.EnsureOpenConnection();
+
+            try
+            {
+                if (result.Success)
+                {
+                    await this.Connection.ExecuteAsync(@"
+                    UPDATE BuildQueue
+                    SET CompleteDateTime = @Now,
+                    Status = 4,
+                    LastResultCode = 0,
+                    LastResultDateTime = @Now
+                    WHERE BuildQueueID = @BuildQueueID;
+                ", param: new
+                    {
+                        BuildQueueID = buildQueueID,
+                        Now = DateTimeOffset.Now
+                    });
+
+                    //TODO: UPdate NextBuildNumber?
+                }
+                else if (result.ShouldRetry)
+                {
+                    await this.Connection.ExecuteAsync(@"
+                    UPDATE BuildQueue
+                    SET Status = 1
+                    LastResultCode = @StatusCode,
+                    FailCount = FailCount + 1,
+                    RetryAfterDateTime = @RetryDateTime,
+                    LastResultDateTime = @Now
+                    WHERE BuildQueueID = @BuildQueueID;
+                ", param: new
+                    {
+                        BuildQueueID = buildQueueID,
+                        result.StatusCode,
+                        Now = DateTimeOffset.Now,
+                        RetryDateTime = DateTimeOffset.Now.AddMinutes(1)
+                    });
+                }
+                else
+                {
+                    await this.Connection.ExecuteAsync(@"
+                    UPDATE BuildQueue
+                    SET Status = 4
+                    CompleteDateTime = @Now,
+                    LastResultCode = @StatusCode,
+                    FailCount = FailCount + 1,
+                    LastResultDateTime = @Now
+                    WHERE BuildQueueID = @BuildQueueID;
+                ", param: new
+                    {
+                        BuildQueueID = buildQueueID,
+                        result.StatusCode,
+                        Now = DateTimeOffset.Now
+                    });
+                }
+
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(ex.Message);
+            }
         }
 
         public async Task<IEnumerable<BuildQueueEntry>> DequeueBuilds(string agentIdentifier)
         {
             this.EnsureOpenConnection();
 
-            var queue = await this.Connection.QueryAsync<dynamic>("SELECT ProjectID,CreateDateTime,BuildQueueID FROM BuildQueue WHERE AssignedAgentID = @AgentID AND [Status] = 1;", param: new
+            return await this.Connection.QueryAsync<BuildQueueEntry>(@"
+                UPDATE BuildQueue
+                SET [Status] = 2, 
+                    [LockExpiresDateTime] = @LockExpiresDateTime
+                OUTPUT inserted.*
+                FROM BuildQueue 
+                WHERE AssignedAgentID = @AgentID 
+                    AND [Status] = 1
+                    AND ([FailCount] = 0 OR [RetryAfterDateTime] < SYSDATETIMEOFFSET())
+                ;",
+                param: new
             {
-                AgentID = agentIdentifier
+                AgentID = agentIdentifier,
+                LockExpiresDateTime = DateTimeOffset.Now.AddMinutes(1)
             });
-
-            var projects = new List<BuildQueueEntry>();
-
-            foreach (var entry in queue)
-            {
-                var state = await this.GetProjectState((Guid)entry.ProjectID);
-
-                projects.Add(new BuildQueueEntry()
-                {
-                    BuildIdentifier = (Guid)entry.BuildQueueID,
-                    EnqueueDateTime = (DateTimeOffset)entry.CreateDateTime,
-                    ProjectIdentifier = (Guid)entry.ProjectID,
-                    RevisionIdentifier = (string)entry.RevisionIdentifier
-                });
-            }
-
-            return projects;
         }
 
-        public async Task<Guid> EnqueBuild(BuildQueueEntry entry)
+        public async Task<Guid> EnqueueBuild(BuildQueueEntry entry)
         {
             this.EnsureOpenConnection();
 
-            var agentQuery = @"
-                SELECT TOP 1 A.AgentID, P.NextBuildNumber
+            if (entry.BuildQueueID == Guid.Empty)
+            {
+                entry.BuildQueueID = Guid.NewGuid();
+            }
+
+            // if a build already exists in the queue for the same project with status 1 (queued)
+            //      update the revision ident to the newer value
+            // else if the lock is expired on a status 2 record
+            //      reset the lock to null
+            //      reset the status to 1
+            //      update the revision ident to the newer value
+            // else if the lock is not expired
+            //      insert a new build queue record
+
+            var findAgentCmd = @"
+                SELECT TOP 1 A.AgentID
                 FROM Project P 
                     INNER JOIN Agent A ON A.EnvironmentID = P.EnvironmentID
-                WHERE P.ProjectID = @ProjectID;";
+                WHERE P.ProjectID = @ProjectID;   
+            ";
 
-            using (var transaction = this.Connection.BeginTransaction())
+            var batchCmd = @"
+                IF (EXISTS (SELECT 1 FROM BuildQueue WHERE [Status]=1 AND ProjectID=@ProjectID)) BEGIN
+                    UPDATE BuildQueue
+                    SET RevisionIdentifier = @RevisionIdentifier
+                    WHERE ProjectID = @ProjectID
+                        AND [Status] = 1;
+                END ELSE IF (EXISTS (SELECT 1 FROM BuildQueue WHERE [Status]=2 AND ProjectID = @ProjectID AND [LockExpiresDateTime] < SYSDATETIMEOFFSET())) BEGIN
+                    UPDATE BuildQueue
+                    SET [LockExpiresDateTime] = NULL,
+                        [Status] = 1,
+                        [LastResultCode] = 3,
+                        [FailCount] = [FailCount] + 1
+                    WHERE [ProjectID] = @ProjectID
+                        AND [Status] = 2;
+                END ELSE BEGIN
+                    INSERT INTO BuildQueue ([BuildQueueID],[ProjectID],[RevisionIdentifier],[BuildNumber],[CreateDateTime],[AssignedDateTime],[AssignedAgentID],[Status])
+                    VALUES (@BuildQueueID, @ProjectID, @RevisionIdentifier, @BuildNumber, @CreateDateTime, @AssignedDateTime, @AssignedAgentID, @Status);
+                END
+            ";
+
+            using (var transaction = this.Connection.BeginTransaction(IsolationLevel.Serializable))
             {
-                // Get the first agent assigned to the environment for the given project
-                var projectData = await this.Connection.QuerySingleOrDefaultAsync<dynamic>(agentQuery, param: new
+                var agentID = await this.Connection.QuerySingleOrDefaultAsync<Guid?>(findAgentCmd, param: new
                 {
-                    ProjectID = entry.ProjectIdentifier
+                    ProjectID = entry.ProjectID
                 }, transaction: transaction);
-
-                if (projectData == null)
+                
+                if (!agentID.HasValue)
                 {
-                    throw new Exception("No agent is available for the given environment.");
+                    throw new Exception($"No agent could be found to assign for project {entry.ProjectID}.");
                 }
 
-                var queueRecord = new DbBuildQueueRecord()
+                // Get the first agent assigned to the environment for the given project
+                var batchResult = await this.Connection.ExecuteAsync(batchCmd, param: new
                 {
-                    BuildQueueID = Guid.NewGuid(),
-                    ProjectID = entry.ProjectIdentifier,
-                    RevisionIdentifier = entry.RevisionIdentifier,
-                    CreateDateTime = entry.EnqueueDateTime,
-                    BuildNumber = projectData.NextBuildNumber,
-                    AssignedDateTime = DateTimeOffset.UtcNow,
-                    AssignedAgentID = projectData.AgentID,
-                };
-
-                await this.Connection.InsertAsync(queueRecord, transaction: transaction);
+                    entry.BuildQueueID,
+                    entry.ProjectID,
+                    entry.RevisionIdentifier,
+                    BuildNumber = entry.BuildNumber,
+                    CreateDateTime = DateTimeOffset.Now,
+                    AssignedDateTime = DateTimeOffset.Now,
+                    AssignedAgentID = agentID,
+                    Status = 1
+                }, transaction: transaction);
 
                 transaction.Commit();
 
-                return queueRecord.BuildQueueID;
+                return entry.BuildQueueID;
             }
         }
 
-        public Task<IBuildOutputWriter> GetMessageWriterAsync(Guid projectIdentifier, Guid buildIdentifier)
+        public async Task WriteLogMessageAsync(Guid buildIdentifier, MessageSeverity severity, int messageNumber, string message)
         {
-            throw new NotImplementedException();
+            this.EnsureOpenConnection();
+
+            await this.Connection.ExecuteAsync(@"
+                INSERT INTO BuildLog(BuildQueueID, MessageNumber, Severity, Message, [DateTime])
+                VALUES(@BuildQueueID, @MessageNumber, @Severity, @Message, @DateTime);
+            ", param: new
+            {
+                BuildQueueID = buildIdentifier,
+                Severity = severity,
+                MessageNumber = messageNumber,
+                Message = message,
+                DateTime = DateTimeOffset.UtcNow
+            });
         }
 
         public void Dispose()

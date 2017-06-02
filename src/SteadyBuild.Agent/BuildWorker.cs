@@ -38,12 +38,12 @@ namespace SteadyBuild.Agent
                 try
                 {
                     var environment = new BuildEnvironment(System.IO.Path.Combine(_options.WorkingPath, buildJob.Configuration.Name), buildJob.Output);
-                    var state = buildJob.Configuration.LastState;
+                    int failCount = buildJob.QueueEntry.FailCount;
 
                     environment.AddGlobalVariables();
                     environment.AddAgentVariables(_options);
                     environment.AddProjectConfigurationVariables(buildJob.Configuration);
-                    environment.AddProjectStateVariables(buildJob.Configuration.LastState);
+                    environment.AddQueueEntryVariables(buildJob.QueueEntry);
 
                     // Create the working path if it does not exist
                     if (!System.IO.Directory.Exists(environment.WorkingPath))
@@ -75,35 +75,31 @@ namespace SteadyBuild.Agent
 
                     if (buildResult.Success)
                     {
-                        state.FailCount = 0;
-                        state.LastSuccessDateTime = DateTimeOffset.UtcNow;
-                        state.LastSuccessCommitIdentifier = buildJob.RevisionIdentifier;
-                        state.NextBuildNumber++;
-
                         environment.WriteMessage(MessageSeverity.Info, "The build project completed successfully.");
                     }
                     else
                     {
-                        state.NextBuildNumber++;
-                        state.FailCount++;
-                        state.LastFailDateTime = DateTimeOffset.UtcNow;
-                        state.LastFailCommitIdentifier = buildJob.RevisionIdentifier;
+                        failCount++;
 
-                        if (state.FailCount >= maxFailureCount)
+                        if (failCount >= maxFailureCount)
                         {
-                            environment.WriteMessage(MessageSeverity.Error, $"The build project failed too many times ({state.FailCount}) and will not be attempted again.");
+                            buildResult = BuildResult.Fail(buildResult.StatusCode, false);
+
+                            environment.WriteMessage(MessageSeverity.Error, $"The build project failed too many times ({failCount}) and will not be attempted again.");
                         }
                         else
                         {
-                            environment.WriteMessage(MessageSeverity.Warn, $"The build project has failed on try {state.FailCount} of {maxFailureCount} and will be attempted again.");
+                            environment.WriteMessage(MessageSeverity.Warn, $"The build project has failed on try {failCount} of {maxFailureCount} and will be attempted again.");
                         }
                     }
 
-                    await _repository.SetProjectState(buildJob.Configuration.ProjectID, state);
+                    await _repository.SetBuildResultAsync(buildJob.QueueEntry.BuildQueueID, buildResult);
                 }
                 catch (Exception ex)
                 {
-                    //TODO: Log worker errors somewhere.
+                    await buildJob.Output.LogErrorAsync(ex.Message);
+                    await _repository.SetBuildResultAsync(buildJob.QueueEntry.BuildQueueID, BuildResult.Fail(3, true));
+
                     System.Diagnostics.Debug.WriteLine(ex.Message);
                 }
             }

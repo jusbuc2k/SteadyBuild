@@ -27,16 +27,6 @@ namespace SteadyBuild.Manager
             this.IsActive = project.IsActive;
         }
 
-        public DbProjectRecord(BuildProjectConfiguration project, BuildProjectState state) : this(project)
-        {
-            this.LastSuccessDateTime = state.LastSuccessDateTime;
-            this.LastSuccessCommitIdentifier = state.LastSuccessCommitIdentifier;
-            this.LastFailureDateTime = state.LastFailDateTime;
-            this.LastFailureCommitIdentifier = state.LastFailCommitIdentifier;
-            this.LastBuildResultCode = state.LastBuildResultCode;
-            this.FailCount = state.FailCount;
-        }
-
         [ExplicitKey]
         public Guid ProjectID { get; set; } = Guid.NewGuid();
 
@@ -61,17 +51,5 @@ namespace SteadyBuild.Manager
         public bool IsActive { get; set; } = true;
 
         public int NextBuildNumber { get; set; } = 1;
-
-        public int? LastBuildResultCode { get; set; }
-
-        public DateTimeOffset? LastSuccessDateTime { get; set; }
-
-        public string LastSuccessCommitIdentifier { get; set; }
-
-        public DateTimeOffset? LastFailureDateTime { get; set; }
-
-        public string LastFailureCommitIdentifier { get; set; }
-
-        public int FailCount { get; set; } = 0;
     }
 }

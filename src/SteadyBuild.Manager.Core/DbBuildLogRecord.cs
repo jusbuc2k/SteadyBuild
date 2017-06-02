@@ -9,9 +9,6 @@ namespace SteadyBuild.Manager
     internal class DbBuildLogRecord
     {
         [ExplicitKey]
-        public Guid ProjectID { get; set; }
-
-        [ExplicitKey]
         public Guid BuildQueueID { get; set; }
 
         [ExplicitKey]
@@ -20,5 +17,7 @@ namespace SteadyBuild.Manager
         public int Severity { get; set; }
 
         public string Message { get; set; }
+
+        public DateTimeOffset DateTime { get; set; }
     }
 }

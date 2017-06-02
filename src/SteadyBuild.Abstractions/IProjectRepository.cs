@@ -9,12 +9,12 @@ namespace SteadyBuild.Abstractions
     {
         Task<BuildProjectConfiguration> GetProject(Guid projectIdentifier);
 
-        Task<BuildProjectState> GetProjectState(Guid projectIdentifier);
+        Task<BuildQueueEntry> GetMostRecentBuildAsync(Guid projectIdentifier);
 
-        Task SetProjectState(Guid projectIdentifier, BuildProjectState state);
+        Task<IEnumerable<Guid>> GetProjectsToPollForChanges();
 
-        Task<IEnumerable<Guid>> GetProjectsByTriggerMethodAsync(BuildTriggerMethod method);
+        Task WriteLogMessageAsync(Guid buildIdentifier, MessageSeverity severity, int messageNumber, string message);
 
-        Task<IBuildOutputWriter> GetMessageWriterAsync(Guid projectIdentifier, Guid buildIdentifier);
+        Task SetBuildResultAsync(Guid buildQueueID, BuildResult result);
     }
 }

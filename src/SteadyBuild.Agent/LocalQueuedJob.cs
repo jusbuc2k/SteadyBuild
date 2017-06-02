@@ -11,6 +11,8 @@ namespace SteadyBuild
 
         public BuildProjectConfiguration Configuration { get; set; }
 
-        public IBuildOutputWriter Output { get; set; }
+        public BuildQueueEntry QueueEntry { get; set; }
+
+        public ILogger Output { get; set; }
     }
 }

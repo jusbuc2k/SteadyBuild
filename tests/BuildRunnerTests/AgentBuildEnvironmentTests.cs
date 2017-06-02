@@ -68,9 +68,9 @@ namespace BuildRunnerTests
                 RevisionIdentifier = "RevIdent"
             };
 
-            var projectState = new BuildProjectState()
+            var buildEntry = new BuildQueueEntry()
             {
-                NextBuildNumber = 999
+                BuildNumber = 999
             };
 
             var project = new BuildProjectConfiguration()
@@ -90,7 +90,7 @@ namespace BuildRunnerTests
                 env.AddAgentVariables(agentOptions);
                 env.AddCodeInfoVariables(codeInfo);
                 env.AddGlobalVariables();
-                env.AddProjectStateVariables(projectState);
+                env.AddQueueEntryVariables(buildEntry);
                 env.AddProjectConfigurationVariables(project);
 
                 var resultCode = env.StartProcessAsync("cmd.exe", "/c set").Result;
@@ -129,7 +129,7 @@ namespace BuildRunnerTests
             Assert.IsNotNull(vars["CI_BUILDDATE"]);
             Assert.IsNotNull(vars["CI_BUILDDATETIME"]);
 
-            Assert.AreEqual(projectState.NextBuildNumber, int.Parse(vars["CI_BUILDNUMBER"]));
+            Assert.AreEqual(project.NextBuildNumber, int.Parse(vars["CI_BUILDNUMBER"]));
 
             Assert.AreEqual(project.ProjectID.ToString(), vars["CI_PROJECTID"]);
             Assert.AreEqual(project.Name, vars["CI_PROJECTNAME"]);
@@ -147,8 +147,8 @@ namespace BuildRunnerTests
             using (var te = new BuildEnvironment("C:\\Build", writer))
             {
                 var processResult = te.StartProcessAsync("cmd.exe", $"/c echo {testToken} 1>&2");
-
                 var resultCode = processResult.Result;
+
                 Assert.IsTrue(processResult.IsCompleted);
                 Assert.AreEqual(0, resultCode);
             }

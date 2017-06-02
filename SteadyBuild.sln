@@ -19,6 +19,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SteadyBuild.Manager.Core", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SteadyBuild.Poller", "src\SteadyBuild.Poller\SteadyBuild.Poller.csproj", "{A7EB23A6-BA6B-49D0-B7F1-738FC909EE02}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "db", "db", "{1327DF16-FF04-49DF-8C1C-76B87C3D4FD3}"
+	ProjectSection(SolutionItems) = preProject
+		db\Schema.sql = db\Schema.sql
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

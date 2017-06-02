@@ -69,7 +69,7 @@ namespace SteadyBuild.Abstractions
             {
                 if (!process.Start())
                 {
-                    throw new Exception($"Unable to start task {fileName}.");
+                    throw new Exception($"Unable to start process {fileName} {arguments}.");
                 }
 
                 if (output != null)
@@ -86,13 +86,18 @@ namespace SteadyBuild.Abstractions
                 {
                     if (!exitEventWait.WaitOne(1000 * timeout))
                     {
-                        throw new TimeoutException("The operation has timed out.");
+                        throw new TimeoutException($"The process timed out after waiting {timeout} seconds.");
                     }
                 }
                 else
                 {
                     exitEventWait.WaitOne();
                 }
+
+                // We have to do this so that the output/error 
+                // events finish firing before we release the wait
+                // on the caller
+                process.WaitForExit();
 
                 return process.ExitCode;
             });

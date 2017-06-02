@@ -44,11 +44,12 @@ namespace SteadyBuild.Agent
             {
                 while (!cancelToken.IsCancellationRequested)
                 {
-                    await this.WaitForJobsAsync();
-
-                    // Notify the 
-                    buildReceivedEvent.Set();
-                }                
+                    if (await this.WaitForJobsAsync())
+                    {
+                        // Notify the main thread we have new builds.
+                        buildReceivedEvent.Set();
+                    }
+                }
             }, cancelToken);
 
             // Queue processing thread
@@ -56,27 +57,41 @@ namespace SteadyBuild.Agent
             {
                 buildReceivedEvent.WaitOne();
 
+                this.Logger.LogInfoAsync("Processing new builds in queue...").Wait();
+
                 this.ProcessQueue();
             }
             
             this.Logger.LogInfoAsync("Build agent is stopping.").Wait();
         }
 
-        protected async Task WaitForJobsAsync()
+        protected async Task<bool> WaitForJobsAsync()
         {
-            var builds = await this.Queue.WaitForJobsAsync(this.AgentOptions.AgentIdentifier);
-
-            await this.Logger.LogInfoAsync($"{builds.Count()} projects were received from the build queue for processing.");
-
-            foreach (var queueEntry in builds)
+            try
             {
-                _localQueue.Enqueue(new LocalQueuedJob()
+                var builds = await this.Queue.WaitForJobsAsync(this.AgentOptions.AgentIdentifier, this.Logger);
+
+                await this.Logger.LogInfoAsync($"{builds.Count()} projects were received from the build queue for processing.");
+
+                foreach (var queueEntry in builds)
                 {
-                    RevisionIdentifier = queueEntry.RevisionIdentifier,
-                    Configuration = await this.Repository.GetProject(queueEntry.ProjectIdentifier),
-                    Output = await this.Repository.GetMessageWriterAsync(queueEntry.ProjectIdentifier, queueEntry.BuildIdentifier)
-                });
+                    _localQueue.Enqueue(new LocalQueuedJob()
+                    {
+                        QueueEntry = queueEntry,
+                        RevisionIdentifier = queueEntry.RevisionIdentifier,
+                        Configuration = await this.Repository.GetProject(queueEntry.ProjectID),
+                        Output = new ProjectLogger(this.Repository, queueEntry.BuildQueueID, MessageSeverity.Debug)
+                    });
+                }
+
+                return true;
             }
+            catch (Exception ex)
+            {
+                await this.Logger.LogErrorAsync(ex.Message);
+            }
+
+            return false;
         }
 
         protected void ProcessQueue()

@@ -35,12 +35,6 @@ CREATE TABLE dbo.Project (
 	[TriggerMethod] tinyint NOT NULL,
 	-- project state
 	[NextBuildNumber] int NOT NULL,
-	[LastBuildResultCode] int NULL,
-	[LastSuccessDateTime] datetimeoffset NULL,
-	[LastSuccessCommitIdentifier] nvarchar(256) NULL,
-	[LastFailureDateTime] datetimeoffset NULL,
-	[LastFailureCommitIdentifier] nvarchar(256) NOT NULL,
-	[FailCount] int NOT NULL,
 
 	CONSTRAINT PK_Project PRIMARY KEY CLUSTERED ([ProjectID]),
 	CONSTRAINT UQ_Project_Name UNIQUE ([Name]),
@@ -130,7 +124,14 @@ CREATE TABLE dbo.BuildQueue (
 	[AssignedDateTime] datetimeoffset NULL,
 	[AssignedAgentID] uniqueidentifier  NULL,
 	[CompleteDateTime] datetimeoffset NULL,
-	[Status] tinyint NOT NULL, --1 = queueud, 2 = running, 3 = done
+	[Status] tinyint NOT NULL, --1 = queued, 2 = running, 3 = done
+	[LockExpiresDateTime] datetimeoffset NULL,
+	RetryAfterDateTime datetimeoffset NULL,
+
+	[LastResultCode] int NULL,
+	[LastResultDateTime] datetimeoffset NULL,
+	[FailCount] int NOT NULL CONSTRAINT DF_BuildQueue_FailCount DEFAULT(0),
+
 	CONSTRAINT PK_BuildQueue PRIMARY KEY ([BuildQueueID]),
 	CONSTRAINT FK_BuildQueue_Project FOREIGN KEY ([ProjectID]) REFERENCES dbo.Project ([ProjectID]),
 	CONSTRAINT FK_BuildQueue_Agent FOREIGN KEY ([AssignedAgentID]) REFERENCES dbo.Agent ([AgentID])
@@ -142,13 +143,17 @@ CREATE INDEX IX_BuildQueue_AssignedAgentID ON dbo.BuildQueue ([AssignedAgentID])
 GO
 
 CREATE TABLE dbo.BuildLog (
-	[ProjectID] uniqueidentifier NOT NULL,
-	[BuildQueueID] int NOT NULL,
+	[BuildQueueID] uniqueidentifier NOT NULL,
 	[MessageNumber] int NOT NULL,
 	[Severity] int NOT NULL,
 	[Message] nvarchar(max) NULL,
-	CONSTRAINT PK_BuildLog PRIMARY KEY CLUSTERED ([ProjectID],[BuildQueueID],[MessageNumber]),
-	CONSTRAINT FK_BuildLog_Project FOREIGN KEY ([ProjectID]) REFERENCES dbo.Project([ProjectID]),
+	[DateTime] datetimeoffset NOT NULL,
+	CONSTRAINT PK_BuildLog PRIMARY KEY CLUSTERED ([BuildQueueID],[MessageNumber]),
+	CONSTRAINT FK_BuildLog_BuildQueue FOREIGN KEY ([BuildQueueID]) REFERENCES dbo.BuildQueue(BuildQueueID),
 );
 GO
 
+DECLARE @Foo datetimeoffset = SYSDATETIMEOFFSET();
+DECLARE @bar datetimeoffset = SYSDATETIMEOFFSET();
+
+SELECT @foo, @Bar;

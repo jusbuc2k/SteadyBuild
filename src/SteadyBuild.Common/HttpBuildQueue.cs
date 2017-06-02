@@ -17,11 +17,11 @@ namespace SteadyBuild
             _client.BaseAddress = new Uri(url);
         }
 
-        public async Task<Guid> EnqueBuild(BuildQueueEntry entry)
+        public async Task<Guid> EnqueueBuild(BuildQueueEntry entry)
         {
             var json = Newtonsoft.Json.JsonConvert.SerializeObject(entry);
 
-            var message = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"api/EnqueueJob/{entry.ProjectIdentifier}");
+            var message = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"api/EnqueueBuild/{entry.ProjectID}");
 
             message.Content = new System.Net.Http.StringContent(json);
 

@@ -2,7 +2,7 @@
   "profiles": {
     "SteadyBuild.Poller": {
       "commandName": "Project",
-      "commandLineArgs": "\"Data Source=(LocalDB)\\MSSQLLocalDB;AttachDbFilename=C:\\code\\git\\BuildRunnerDotNet\\db\\SteadBuildManager.mdf;Integrated Security=True;Connect Timeout=30\""
+      "commandLineArgs": "\"Data Source=(LocalDB)\\MSSQLLocalDB;AttachDbFilename=C:\\code\\github\\SteadyBuild\\SteadyBuild.mdf;Integrated Security=True;Connect Timeout=30;MultipleActiveResultSets=true\""
     }
   }
 }

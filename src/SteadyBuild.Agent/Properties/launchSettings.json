@@ -2,7 +2,7 @@
   "profiles": {
     "SteadyBuild.Agent": {
       "commandName": "Project",
-      "commandLineArgs": "-q http://localhost:50134/ -i test"
+      "commandLineArgs": "-q http://localhost:50134/ -i 6a5b08cb-2df7-4188-8a02-1eaab0ce8b77"
     }
   }
 }

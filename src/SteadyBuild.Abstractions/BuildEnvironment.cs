@@ -10,7 +10,7 @@ namespace SteadyBuild.Abstractions
     {
         public const string ENV_PREFIX = "CI_";
 
-        public BuildEnvironment(string workingPath, IBuildOutputWriter output)
+        public BuildEnvironment(string workingPath, ILogger output)
         {
             this.WorkingPath = Environment.ExpandEnvironmentVariables(workingPath);
             this.Output = output;
@@ -69,9 +69,9 @@ namespace SteadyBuild.Abstractions
             }
         }
 
-        public void AddProjectStateVariables(BuildProjectState state)
+        public void AddQueueEntryVariables(BuildQueueEntry queueEntry)
         {
-            this.Variables.Add("BuildNumber", state.NextBuildNumber.ToString());
+            this.Variables.Add("BuildNumber", queueEntry.BuildNumber.ToString());
         }
 
         public virtual void AddCodeInfoVariables(CodeRepositoryInfo codeInfo)
@@ -118,7 +118,7 @@ namespace SteadyBuild.Abstractions
             this.Output.LogMessageAsync(severity, message).Wait();
         }
 
-        protected IBuildOutputWriter Output { get; private set; }
+        protected ILogger Output { get; private set; }
 
         public void Dispose()
         {

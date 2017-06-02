@@ -4,7 +4,7 @@ using System.Text;
 
 namespace SteadyBuild.Abstractions
 {
-    public enum MessageSeverity
+    public enum MessageSeverity : byte
     {
         Debug = 7,
         Info = 6,

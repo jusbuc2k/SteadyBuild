@@ -57,6 +57,8 @@ namespace SteadyBuild.Abstractions
 
         public bool IsActive { get; set; }
 
-        public BuildProjectState LastState { get; set; }
+        public int NextBuildNumber { get; set; } = 1;
+
+        public BuildTriggerMethod TriggerMethod { get; set; } = BuildTriggerMethod.Polling;
     }
 }

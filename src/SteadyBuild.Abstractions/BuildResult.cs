@@ -19,14 +19,6 @@ namespace SteadyBuild.Abstractions
             }
         }
 
-        public bool Skipped
-        {
-            get
-            {
-                return this.StatusCode == -1;
-            }
-        }
-
         public bool Timeout
         {
             get

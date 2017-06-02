@@ -4,10 +4,32 @@ using System.Text;
 
 namespace SteadyBuild.Abstractions
 {
-    public class EvaluateStateResult
+    public class CodeCheckResult
     {
-        public string RevisionIdentifier { get; set; }
+        public CodeCheckResult(string revisionIdentifier, bool needsBuild)
+        {
+            this.RevisionIdentifier = revisionIdentifier;
+            this.NeedsBuild = needsBuild;
+        }
 
-        public bool NeedsBuild { get; set; }
+        public string RevisionIdentifier { get; private set; }
+
+        public bool NeedsBuild { get; private set; }
+
+        public static CodeCheckResult Changed(string revisionIdentifier)
+        {
+            return new CodeCheckResult(revisionIdentifier, true);
+        }
+
+        public static CodeCheckResult Force(string revisionIdentifier)
+        {
+            return new CodeCheckResult(revisionIdentifier, true);
+        }
+
+        public static CodeCheckResult Skip()
+        {
+            return new CodeCheckResult(null, false);
+        }
+
     }
 }

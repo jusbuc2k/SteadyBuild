@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using SteadyBuild.Abstractions;
 using Microsoft.AspNetCore.Authorization;
+using SteadyBuild.Manager.Models;
 
 namespace SteadyBuild.Manager.Controllers
 {
@@ -32,13 +33,11 @@ namespace SteadyBuild.Manager.Controllers
             return await _queue.DequeueBuilds(agentIdentifier);
         }
 
-        [Route("EnqueueJob/{projectId}")]
+        [Route("EnqueueBuild/{projectId}")]
         [HttpPost]
-        public Task EnqueueJob(string projectId, [FromBody]BuildQueueEntry entry)
+        public async Task EnqueueBuild(string projectId, [FromBody]BuildQueueEntry entry)
         {
-            _queue.EnqueBuild(entry);
-
-            return Task.CompletedTask;
+            await _queue.EnqueueBuild(entry);
         }
 
         #endregion
@@ -49,12 +48,12 @@ namespace SteadyBuild.Manager.Controllers
             return await _repository.GetProject(projectID);
         }
 
-        [Route("Projects/ByTriggerMethod/{method}")]
-        public async Task<IEnumerable<Guid>> GetProjectsByTriggerMethod(string method)
+        [Route("Projects/ProjectsToPoll")]
+        public async Task<IEnumerable<Guid>> GetProjectsToPoll(string method)
         {
             if (System.Enum.TryParse(method, out BuildTriggerMethod methodEnum))
             {
-                return await _repository.GetProjectsByTriggerMethodAsync(methodEnum);
+                return await _repository.GetProjectsToPollForChanges();
             }
             else
             {
@@ -63,19 +62,21 @@ namespace SteadyBuild.Manager.Controllers
         }
 
         [HttpPost]
-        [Route("ProjectResult/{projectIdentifier}")]
-        public async Task<ActionResult> SetProjectResult(string projectIdentifier, [FromBody]BuildProjectState state)
+        [Route("BuildResult/{projectIdentifier}")]
+        public async Task<ActionResult> SetBuildResult(Guid projectIdentifier, [FromBody]BuildResult result)
         {
-            await _repository.SetProjectState(Guid.Parse(projectIdentifier), state);
+            await _repository.SetBuildResultAsync(projectIdentifier, result);
 
             return this.NoContent();
         }
 
         [HttpPost]
-        [Route("WriteBuildMessages/{projectIdentifier}/{buildNumber}")]
-        public ActionResult WriteBuildMessages(string projectIdentifier, int buildNumber)
+        [Route("WriteBuildMessage/{buildIdentifier}")]
+        public async Task<ActionResult> WriteBuildMessage(Guid buildIdentifier, [FromBody]BuildLogMessageModel model)
         {
-            throw new NotImplementedException();
+            await _repository.WriteLogMessageAsync(buildIdentifier, model.Severity, model.MessageNumber, model.Message);
+
+            return this.NoContent();
         }
     }
 }

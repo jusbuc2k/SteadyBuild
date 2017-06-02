@@ -1,37 +1,33 @@
-﻿using SteadyBuild.Abstractions;
+﻿using SteadyBuild;
+using SteadyBuild.Abstractions;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace BuildRunnerTests.Mock
 {
-    public class MockBuildQueue
+    public class MockBuildQueue : IBuildQueue
     {
-        public ConcurrentBag<BuildQueueSubscription> Subscribers = new ConcurrentBag<BuildQueueSubscription>();
+        public List<BuildQueueEntry> QueueItems = new List<BuildQueueEntry>();
 
-        public void Enqueue(string agentIdentifier, BuildQueueEntry entry)
+        public Task<Guid> EnqueueBuild(BuildQueueEntry entry)
         {
-            foreach (var sub in this.Subscribers)
+            if (entry.BuildQueueID == Guid.Empty)
             {
-                if (sub.AgentIdentifier.Equals(agentIdentifier))
-                {
-                    sub.Callback(entry);
-                }
+                entry.BuildQueueID = Guid.NewGuid();
             }
+
+            QueueItems.Add(entry);
+
+            return Task.FromResult(entry.BuildQueueID);
         }
 
-        public IDisposable Subscribe(string agentIdentifier, Action<BuildQueueEntry> onBuildQueued)
+        public Task<IEnumerable<BuildQueueEntry>> DequeueBuilds(string agentIdentifier)
         {
-            var sub = new BuildQueueSubscription(this.Subscribers)
-            {
-                AgentIdentifier = agentIdentifier,
-                Callback = onBuildQueued
-            };
-
-            this.Subscribers.Add(sub);
-
-            return sub;
+            return Task.FromResult(QueueItems.AsEnumerable());
         }
     }
 }
